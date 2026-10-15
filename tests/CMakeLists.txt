@@ -12,11 +12,14 @@ endif()
 
 # Some hosts (notably macOS, whose default soft limit is 256) start test
 # processes with too few file descriptors for descriptor-heavy tests such as
-# test_event. Raise the soft limit before exec'ing each test; a failure to
+# test_event_cpp. Raise the soft limit before exec'ing each test; a failure to
 # raise it (hard limit too low) is ignored so the test still runs.
 if(NOT WIN32)
     set(SS_TEST_LAUNCHER sh -c "ulimit -n 1024 2>/dev/null\; exec \"$0\" \"$@\"")
 endif()
+
+# "crypto.h" and friends come from the C reference implementation.
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/reference)
 
 # Helper function to add a unit test
 function(ss_add_test name sources libs)
@@ -80,6 +83,12 @@ ss_add_test(test_event_cpp "test_event_cpp.cpp" "ss_uv")
 ss_strict_warnings(test_event_cpp.cpp)
 set_tests_properties(test_event_cpp PROPERTIES TIMEOUT 30)
 
+# test_heap_guard_cpp - library heaps fall back instead of failing a realloc
+ss_add_test(test_heap_guard_cpp
+    "test_heap_guard_cpp.cpp;${PROJECT_SOURCE_DIR}/src/core/heap_guard.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+    "ss_uv;ss_cares;ss_mbedcrypto;ss_sodium")
+ss_strict_warnings(test_heap_guard_cpp.cpp)
+
 # C++ sources under src/ must not allocate on the heap (see the script).
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
@@ -142,14 +151,14 @@ ss_add_test(test_netutils
 
 # test_cache - expiration uses a platform monotonic clock
 ss_add_test(test_cache
-    "test_cache.c;${PROJECT_SOURCE_DIR}/src/cache.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+    "test_cache.c;${CMAKE_CURRENT_SOURCE_DIR}/reference/cache.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
     "ss_sodium")
 
 # test_cache_cpp - fixed-capacity cache edge cases
 ss_add_test(test_cache_cpp
-    "test_cache_cpp.cpp;${PROJECT_SOURCE_DIR}/src/cache.cpp"
+    "test_cache_cpp.cpp;${CMAKE_CURRENT_SOURCE_DIR}/reference/cache.cpp"
     "ss_sodium")
-ss_strict_warnings(test_cache_cpp.cpp ${PROJECT_SOURCE_DIR}/src/cache.cpp)
+ss_strict_warnings(test_cache_cpp.cpp ${CMAKE_CURRENT_SOURCE_DIR}/reference/cache.cpp)
 
 # test_ppbloom - needs bloom
 set(TEST_PPBLOOM_LIBS "")
@@ -164,8 +173,8 @@ set(TEST_RULE_LIBS
     ss_pcre2
     ss_sodium
 )
-ss_add_test(test_rule
-    "test_rule.c;${PROJECT_SOURCE_DIR}/src/rule.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+ss_add_test(test_rule_cpp
+    "test_rule_cpp.cpp;${PROJECT_SOURCE_DIR}/src/rule.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
     "${TEST_RULE_LIBS}")
 
 # test_acl - ACL precedence and prefix matching
@@ -186,22 +195,23 @@ ss_add_test(test_jconf
     "test_jconf.c;${PROJECT_SOURCE_DIR}/src/jconf.cpp;${PROJECT_SOURCE_DIR}/src/json.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp;${PROJECT_SOURCE_DIR}/src/netutils.cpp"
     "${TEST_JCONF_LIBS};${SS_MATH_LIBRARY}")
 
-# Crypto sources shared by the tests that link the crypto layer. The AEAD-2022
-# ciphers pull in BLAKE3 (linked as the `blake3` target) and the session-based
-# UDP codec, so they must be built together with crypto.cpp.
+# The original C cipher implementation, kept under tests/reference as an
+# independent oracle: the C++ codecs are tested against it byte for byte,
+# and udp_session_eviction_client speaks to ss-server with it. The programs
+# no longer contain it.
 set(SS_CRYPTO_TEST_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/crypto.cpp
-    ${PROJECT_SOURCE_DIR}/src/aead.cpp
-    ${PROJECT_SOURCE_DIR}/src/aead2022.cpp
-    ${PROJECT_SOURCE_DIR}/src/aead2022_udp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/crypto.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/aead.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/aead2022.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/aead2022_udp.cpp
     ${PROJECT_SOURCE_DIR}/src/ppbloom.cpp
-    ${PROJECT_SOURCE_DIR}/src/cache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reference/cache.cpp
     ${PROJECT_SOURCE_DIR}/src/base64.cpp
     ${PROJECT_SOURCE_DIR}/src/utils.cpp
 )
 
 if(SS_ENABLE_LEGACY)
-    list(APPEND SS_CRYPTO_TEST_SOURCES ${PROJECT_SOURCE_DIR}/src/stream.cpp)
+    list(APPEND SS_CRYPTO_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/reference/stream.cpp)
 endif()
 
 # test_buffer - needs sodium and mbedtls for crypto.cpp buffer functions
@@ -230,20 +240,20 @@ ss_add_test(test_aead2022
 
 # test_crypto_aead_cpp - C++ AEAD codecs, differentially against aead.cpp
 ss_add_test(test_crypto_aead_cpp
-    "test_crypto_aead_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${SS_CRYPTO_TEST_SOURCES}"
+    "test_crypto_aead_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${PROJECT_SOURCE_DIR}/src/crypto/keys.cpp;${SS_CRYPTO_TEST_SOURCES}"
     "${TEST_CRYPTO_LIBS};${SS_MATH_LIBRARY}")
 ss_strict_warnings(test_crypto_aead_cpp.cpp ${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp)
 
 # test_crypto_aead2022_cpp - C++ SIP022 codecs, differentially against aead2022.cpp
 ss_add_test(test_crypto_aead2022_cpp
-    "test_crypto_aead2022_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead2022.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${SS_CRYPTO_TEST_SOURCES}"
+    "test_crypto_aead2022_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead2022.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${PROJECT_SOURCE_DIR}/src/crypto/keys.cpp;${SS_CRYPTO_TEST_SOURCES}"
     "${TEST_CRYPTO_LIBS};${SS_MATH_LIBRARY}")
 ss_strict_warnings(test_crypto_aead2022_cpp.cpp ${PROJECT_SOURCE_DIR}/src/crypto/aead2022.cpp)
 
 if(SS_ENABLE_LEGACY)
 # test_crypto_stream_cpp - C++ stream codecs, differentially against stream.cpp
 ss_add_test(test_crypto_stream_cpp
-    "test_crypto_stream_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/stream.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${SS_CRYPTO_TEST_SOURCES}"
+    "test_crypto_stream_cpp.cpp;${PROJECT_SOURCE_DIR}/src/crypto/stream.cpp;${PROJECT_SOURCE_DIR}/src/crypto/aead.cpp;${PROJECT_SOURCE_DIR}/src/crypto/keys.cpp;${SS_CRYPTO_TEST_SOURCES}"
     "${TEST_CRYPTO_LIBS};${SS_MATH_LIBRARY}")
 ss_strict_warnings(test_crypto_stream_cpp.cpp ${PROJECT_SOURCE_DIR}/src/crypto/stream.cpp)
 endif()
@@ -274,10 +284,14 @@ ss_add_test(test_process
     "ss_sodium")
 set_tests_properties(test_process PROPERTIES TIMEOUT 20)
 
-ss_add_test(test_resolv
-    "test_resolv.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/relay/resolver.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
-    "ss_ev;ss_cares;ss_sodium")
-set_tests_properties(test_resolv PROPERTIES TIMEOUT 20)
+if(UNIX)
+    # The resolver against a delayed local DNS server.
+    ss_add_test(test_resolver_cpp
+        "test_resolver_cpp.cpp;${PROJECT_SOURCE_DIR}/src/relay/resolver.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+        "ss_ev;ss_cares;ss_sodium")
+    ss_strict_warnings(test_resolver_cpp.cpp)
+    set_tests_properties(test_resolver_cpp PROPERTIES TIMEOUT 30)
+endif()
 
 set(TEST_LITERAL_LIBS ss_sodium)
 if(SS_ENABLE_REGEX)
@@ -287,12 +301,6 @@ ss_add_test(test_acl_literal
     "test_acl_literal.c;${PROJECT_SOURCE_DIR}/src/acl.cpp;${PROJECT_SOURCE_DIR}/src/ipset.cpp;${PROJECT_SOURCE_DIR}/src/rule.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
     "${TEST_LITERAL_LIBS}")
 
-ss_add_test(test_event "test_event.c" "ss_ev")
-set_tests_properties(test_event PROPERTIES TIMEOUT 30)
-ss_add_test(test_resolv_async
-    "test_resolv_async.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/relay/resolver.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
-    "ss_ev;ss_cares;ss_sodium")
-set_tests_properties(test_resolv_async PROPERTIES TIMEOUT 30)
 
 # Preloadable malloc counter for the allocation audit. It interposes the
 # system allocator, so it is only built where that is supported (glibc,
@@ -328,6 +336,12 @@ if(SS_BUILD_EXECUTABLES AND NOT CMAKE_CROSSCOMPILING)
                         --bin ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
             set_tests_properties(test_experiment_supervisor PROPERTIES
                 LABELS "integration" TIMEOUT 30)
+            if(TARGET ss-manager)
+                add_test(NAME test_manager
+                    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_manager.py
+                            --bin ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+                set_tests_properties(test_manager PROPERTIES LABELS "integration" TIMEOUT 60)
+            endif()
         endif()
         add_test(NAME test_experimental_transports
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/experiments/test_transport.py)
