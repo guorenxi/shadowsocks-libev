@@ -263,7 +263,7 @@ ss_add_test(test_process
 set_tests_properties(test_process PROPERTIES TIMEOUT 20)
 
 ss_add_test(test_resolv
-    "test_resolv.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+    "test_resolv.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/relay/resolver.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
     "ss_ev;ss_cares;ss_sodium")
 set_tests_properties(test_resolv PROPERTIES TIMEOUT 20)
 
@@ -278,7 +278,7 @@ ss_add_test(test_acl_literal
 ss_add_test(test_event "test_event.c" "ss_ev")
 set_tests_properties(test_event PROPERTIES TIMEOUT 30)
 ss_add_test(test_resolv_async
-    "test_resolv_async.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
+    "test_resolv_async.c;${PROJECT_SOURCE_DIR}/src/resolv.cpp;${PROJECT_SOURCE_DIR}/src/relay/resolver.cpp;${PROJECT_SOURCE_DIR}/src/utils.cpp"
     "ss_ev;ss_cares;ss_sodium")
 set_tests_properties(test_resolv_async PROPERTIES TIMEOUT 30)
 
@@ -354,6 +354,15 @@ if(SS_BUILD_EXECUTABLES AND NOT CMAKE_CROSSCOMPILING)
                     --self --printable-salt --bin ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
         set_tests_properties(test_printable_salt_interop PROPERTIES
             LABELS "integration" TIMEOUT 90)
+        # ss-tunnel through the C relay engine against ss-server (and
+        # shadowsocks-rust when installed), every method.
+        set(SS_TUNNEL_INTEROP_ARGS --bin ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+        if(SS_ENABLE_LEGACY)
+            list(APPEND SS_TUNNEL_INTEROP_ARGS --legacy)
+        endif()
+        add_test(NAME test_tunnel_interop
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tunnel_interop.py ${SS_TUNNEL_INTEROP_ARGS})
+        set_tests_properties(test_tunnel_interop PROPERTIES LABELS "integration" TIMEOUT 300)
     endif()
 endif()
 

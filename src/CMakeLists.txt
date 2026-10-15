@@ -48,6 +48,20 @@ else()
     set(SS_PLUGIN_SOURCE plugin_disabled.cpp)
 endif()
 
+# The C++ relay engine (src/relay) and the codecs it runs on.
+set(SS_RELAY_SOURCE
+        relay/codec.cpp
+        relay/socket.cpp
+        relay/tcp.cpp
+        relay/udp.cpp
+        relay/resolver.cpp
+        crypto/aead.cpp
+        crypto/aead2022.cpp
+        )
+if(SS_ENABLE_LEGACY)
+    list(APPEND SS_RELAY_SOURCE crypto/stream.cpp)
+endif()
+
 set(SS_SHARED_SOURCES
         ppbloom.cpp
         utils.cpp
@@ -61,11 +75,11 @@ endif ()
 
 set(LIBSHADOWSOCKS_LIBEV_SOURCE
         ${SS_SHARED_SOURCES}
-        udprelay.cpp
         cache.cpp
         local.cpp
         resolv.cpp
         ssurl.cpp
+        ${SS_RELAY_SOURCE}
         ${SS_CRYPTO_SOURCE}
         ${SS_PLUGIN_SOURCE}
         ${SS_ACL_SOURCE}
@@ -78,19 +92,19 @@ set(SS_LOCAL_SOURCE
 
 set(SS_TUNNEL_SOURCE
         ${SS_SHARED_SOURCES}
-        udprelay.cpp
         cache.cpp
         tunnel.cpp
+        ${SS_RELAY_SOURCE}
         ${SS_CRYPTO_SOURCE}
         ${SS_PLUGIN_SOURCE}
         )
 
 set(SS_SERVER_SOURCE
         ${SS_SHARED_SOURCES}
-        udprelay.cpp
         cache.cpp
         resolv.cpp
         server.cpp
+        ${SS_RELAY_SOURCE}
         ${SS_CRYPTO_SOURCE}
         ${SS_PLUGIN_SOURCE}
         ${SS_ACL_SOURCE}
@@ -103,9 +117,9 @@ set(SS_MANAGER_SOURCE
 
 set(SS_REDIR_SOURCE
         ${SS_SHARED_SOURCES}
-        udprelay.cpp
         cache.cpp
         redir.cpp
+        ${SS_RELAY_SOURCE}
         ${SS_CRYPTO_SOURCE}
         ${SS_PLUGIN_SOURCE}
         )
@@ -124,7 +138,7 @@ if(ENABLE_NFTABLES)
 endif()
 
 # Modules rewritten in C++ compile with the stricter warning set.
-ss_strict_warnings(cache.cpp)
+ss_strict_warnings(cache.cpp resolv.cpp ${SS_RELAY_SOURCE})
 
 function(ss_program name module sources)
     add_executable(${name} ${sources})
