@@ -1,5 +1,5 @@
 /*
- * redir.c - Provide a transparent TCP proxy through remote shadowsocks
+ * redir.cpp - Provide a transparent TCP proxy through remote shadowsocks
  *           server
  *
  * Copyright (C) 2013 - 2019, Max Lv <max.c.lv@gmail.com>
@@ -118,7 +118,7 @@ getdestaddr(int fd, struct sockaddr_storage *destaddr)
     int error         = 0;
 
     if (tcp_tproxy) {
-        error = getsockname(fd, (void *)destaddr, &socklen);
+        error = getsockname(fd, (struct sockaddr *)destaddr, &socklen);
     } else {
         error = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, destaddr, &socklen);
         if (error) { // Didn't find a proper way to detect IP version.
@@ -622,12 +622,12 @@ remote_send_cb(SS_P_ ss_io *w, int revents)
 static remote_t *
 new_remote(int fd, int timeout)
 {
-    remote_t *remote = ss_malloc(sizeof(remote_t));
+    remote_t *remote = (remote_t *)ss_malloc(sizeof(remote_t));
     memset(remote, 0, sizeof(remote_t));
 
-    remote->recv_ctx = ss_malloc(sizeof(remote_ctx_t));
-    remote->send_ctx = ss_malloc(sizeof(remote_ctx_t));
-    remote->buf      = ss_malloc(sizeof(buffer_t));
+    remote->recv_ctx = (struct remote_ctx *)ss_malloc(sizeof(remote_ctx_t));
+    remote->send_ctx = (struct remote_ctx *)ss_malloc(sizeof(remote_ctx_t));
+    remote->buf      = (buffer_t *)ss_malloc(sizeof(buffer_t));
     balloc(remote->buf, SOCKET_BUF_SIZE);
     memset(remote->recv_ctx, 0, sizeof(remote_ctx_t));
     memset(remote->send_ctx, 0, sizeof(remote_ctx_t));
@@ -675,12 +675,12 @@ close_and_free_remote(SS_P_ remote_t *remote)
 static server_t *
 new_server(int fd)
 {
-    server_t *server = ss_malloc(sizeof(server_t));
+    server_t *server = (server_t *)ss_malloc(sizeof(server_t));
     memset(server, 0, sizeof(server_t));
 
-    server->recv_ctx = ss_malloc(sizeof(server_ctx_t));
-    server->send_ctx = ss_malloc(sizeof(server_ctx_t));
-    server->buf      = ss_malloc(sizeof(buffer_t));
+    server->recv_ctx = (struct server_ctx *)ss_malloc(sizeof(server_ctx_t));
+    server->send_ctx = (struct server_ctx *)ss_malloc(sizeof(server_ctx_t));
+    server->buf      = (buffer_t *)ss_malloc(sizeof(buffer_t));
     balloc(server->buf, SOCKET_BUF_SIZE);
     memset(server->recv_ctx, 0, sizeof(server_ctx_t));
     memset(server->send_ctx, 0, sizeof(server_ctx_t));
@@ -690,8 +690,8 @@ new_server(int fd)
     server->send_ctx->server    = server;
     server->send_ctx->connected = 0;
 
-    server->e_ctx = ss_malloc(sizeof(cipher_ctx_t));
-    server->d_ctx = ss_malloc(sizeof(cipher_ctx_t));
+    server->e_ctx = (cipher_ctx_t *)ss_malloc(sizeof(cipher_ctx_t));
+    server->d_ctx = (cipher_ctx_t *)ss_malloc(sizeof(cipher_ctx_t));
     crypto->ctx_init(crypto->cipher, server->e_ctx, 1);
     crypto->ctx_init(crypto->cipher, server->d_ctx, 0);
     cipher_ctx_pair(server->e_ctx, server->d_ctx);
@@ -1003,56 +1003,56 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
 [cli_long_tproxy] */
 
 /* [cli-options]
-\snippet{doc} utils.c cli_short_f
-\snippet{doc} utils.c cli_short_s
-\snippet{doc} utils.c cli_short_p
-\snippet{doc} utils.c cli_short_l
-\snippet{doc} utils.c cli_short_k
-\snippet{doc} utils.c cli_short_t
-\snippet{doc} utils.c cli_short_m
-\snippet{doc} utils.c cli_short_c
-\snippet{doc} utils.c cli_short_b
-\snippet{doc} utils.c cli_short_a
-\snippet{doc} utils.c cli_short_n
-\snippet{doc} utils.c cli_short_h
-\snippet{doc} redir.c cli_short_u
-\snippet{doc} utils.c cli_short_U
-\snippet{doc} utils.c cli_short_T
-\snippet{doc} utils.c cli_short_v
-\snippet{doc} utils.c cli_short_6
-\snippet{doc} utils.c cli_short_A
-\snippet{doc} redir.c cli_long_config
-\snippet{doc} redir.c cli_long_cipher
-\snippet{doc} redir.c cli_long_timeout
-\snippet{doc} redir.c cli_long_user
-\snippet{doc} redir.c cli_long_pid_file
-\snippet{doc} redir.c cli_long_nofile
-\snippet{doc} redir.c cli_long_udp
-\snippet{doc} redir.c cli_long_udp_only
-\snippet{doc} redir.c cli_long_ipv6_first
-\snippet{doc} redir.c cli_long_verbose
-\snippet{doc} redir.c cli_long_server
-\snippet{doc} redir.c cli_long_server_port
-\snippet{doc} redir.c cli_long_listen_address
-\snippet{doc} redir.c cli_long_listen_port
-\snippet{doc} redir.c cli_long_tproxy
-\snippet{doc} utils.c cli_long_version
-\snippet{doc} utils.c cli_long_tcp_only
-\snippet{doc} utils.c cli_long_ipv4_first
-\snippet{doc} utils.c cli_long_fast_open
-\snippet{doc} utils.c cli_long_mtu
-\snippet{doc} utils.c cli_long_mptcp
-\snippet{doc} utils.c cli_long_plugin
-\snippet{doc} utils.c cli_long_plugin_opts
-\snippet{doc} utils.c cli_long_reuse_port
-\snippet{doc} utils.c cli_long_tcp_incoming_sndbuf
-\snippet{doc} utils.c cli_long_tcp_incoming_rcvbuf
-\snippet{doc} utils.c cli_long_tcp_outgoing_sndbuf
-\snippet{doc} utils.c cli_long_tcp_outgoing_rcvbuf
-\snippet{doc} utils.c cli_long_no_delay
-\snippet{doc} utils.c cli_long_password
-\snippet{doc} utils.c cli_long_key
-\snippet{doc} utils.c cli_long_help
+\snippet{doc} utils.cpp cli_short_f
+\snippet{doc} utils.cpp cli_short_s
+\snippet{doc} utils.cpp cli_short_p
+\snippet{doc} utils.cpp cli_short_l
+\snippet{doc} utils.cpp cli_short_k
+\snippet{doc} utils.cpp cli_short_t
+\snippet{doc} utils.cpp cli_short_m
+\snippet{doc} utils.cpp cli_short_c
+\snippet{doc} utils.cpp cli_short_b
+\snippet{doc} utils.cpp cli_short_a
+\snippet{doc} utils.cpp cli_short_n
+\snippet{doc} utils.cpp cli_short_h
+\snippet{doc} redir.cpp cli_short_u
+\snippet{doc} utils.cpp cli_short_U
+\snippet{doc} utils.cpp cli_short_T
+\snippet{doc} utils.cpp cli_short_v
+\snippet{doc} utils.cpp cli_short_6
+\snippet{doc} utils.cpp cli_short_A
+\snippet{doc} redir.cpp cli_long_config
+\snippet{doc} redir.cpp cli_long_cipher
+\snippet{doc} redir.cpp cli_long_timeout
+\snippet{doc} redir.cpp cli_long_user
+\snippet{doc} redir.cpp cli_long_pid_file
+\snippet{doc} redir.cpp cli_long_nofile
+\snippet{doc} redir.cpp cli_long_udp
+\snippet{doc} redir.cpp cli_long_udp_only
+\snippet{doc} redir.cpp cli_long_ipv6_first
+\snippet{doc} redir.cpp cli_long_verbose
+\snippet{doc} redir.cpp cli_long_server
+\snippet{doc} redir.cpp cli_long_server_port
+\snippet{doc} redir.cpp cli_long_listen_address
+\snippet{doc} redir.cpp cli_long_listen_port
+\snippet{doc} redir.cpp cli_long_tproxy
+\snippet{doc} utils.cpp cli_long_version
+\snippet{doc} utils.cpp cli_long_tcp_only
+\snippet{doc} utils.cpp cli_long_ipv4_first
+\snippet{doc} utils.cpp cli_long_fast_open
+\snippet{doc} utils.cpp cli_long_mtu
+\snippet{doc} utils.cpp cli_long_mptcp
+\snippet{doc} utils.cpp cli_long_plugin
+\snippet{doc} utils.cpp cli_long_plugin_opts
+\snippet{doc} utils.cpp cli_long_reuse_port
+\snippet{doc} utils.cpp cli_long_tcp_incoming_sndbuf
+\snippet{doc} utils.cpp cli_long_tcp_incoming_rcvbuf
+\snippet{doc} utils.cpp cli_long_tcp_outgoing_sndbuf
+\snippet{doc} utils.cpp cli_long_tcp_outgoing_rcvbuf
+\snippet{doc} utils.cpp cli_long_no_delay
+\snippet{doc} utils.cpp cli_long_password
+\snippet{doc} utils.cpp cli_long_key
+\snippet{doc} utils.cpp cli_long_help
 [cli-options] */
     static struct option long_options[] = {
         { "config", required_argument, NULL, 'c' },
@@ -1366,9 +1366,9 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
         }
         snprintf(tmp_port, 8, "%d", port);
         if (is_ipv6only(remote_addr, remote_num, ipv6first)) {
-            plugin_host = "::1";
+            plugin_host = (char *)"::1";
         } else {
-            plugin_host = "127.0.0.1";
+            plugin_host = (char *)"127.0.0.1";
         }
         plugin_port = tmp_port;
 
@@ -1376,11 +1376,11 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
     }
 
     if (method == NULL) {
-        method = "chacha20-ietf-poly1305";
+        method = (char *)"chacha20-ietf-poly1305";
     }
 
     if (timeout == NULL) {
-        timeout = "600";
+        timeout = (char *)"600";
     }
     if (ss_parse_int(timeout, 1, INT_MAX, &timeout_secs) == -1) {
         FATAL("invalid timeout");
@@ -1401,9 +1401,9 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
 
     if (local_addr == NULL) {
         if (is_ipv6only(remote_addr, remote_num, ipv6first)) {
-            local_addr = "::1";
+            local_addr = (char *)"::1";
         } else {
-            local_addr = "127.0.0.1";
+            local_addr = (char *)"127.0.0.1";
         }
     }
 
@@ -1464,7 +1464,7 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
     if (plugin != NULL) {
         int len          = 0;
         size_t buf_size  = 256 * remote_num;
-        char *remote_str = ss_malloc(buf_size);
+        char *remote_str = (char *)ss_malloc(buf_size);
 
         snprintf(remote_str, buf_size, "%s", remote_addr[0].host);
         len = strlen(remote_str);
@@ -1500,7 +1500,7 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
     struct listen_ctx listen_ctx;
     memset(&listen_ctx, 0, sizeof(struct listen_ctx));
     listen_ctx.remote_num  = remote_num;
-    listen_ctx.remote_addr = ss_malloc(sizeof(struct sockaddr *) * remote_num);
+    listen_ctx.remote_addr = (struct sockaddr **)ss_malloc(sizeof(struct sockaddr *) * remote_num);
     memset(listen_ctx.remote_addr, 0, sizeof(struct sockaddr *) * remote_num);
     for (i = 0; i < remote_num; i++) {
         char *host = remote_addr[i].host;
@@ -1510,7 +1510,7 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
             host = plugin_host;
             port = plugin_port;
         }
-        struct sockaddr_storage *storage = ss_malloc(sizeof(struct sockaddr_storage));
+        struct sockaddr_storage *storage = (struct sockaddr_storage *)ss_malloc(sizeof(struct sockaddr_storage));
         memset(storage, 0, sizeof(struct sockaddr_storage));
         if (get_sockaddr(host, port, storage, 1, ipv6first) == -1) {
             FATAL("failed to resolve the provided hostname");
@@ -1556,7 +1556,7 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
             LOGI("UDP relay enabled");
             char *host                       = remote_addr[0].host;
             char *port                       = remote_addr[0].port == NULL ? remote_port : remote_addr[0].port;
-            struct sockaddr_storage *storage = ss_malloc(sizeof(struct sockaddr_storage));
+            struct sockaddr_storage *storage = (struct sockaddr_storage *)ss_malloc(sizeof(struct sockaddr_storage));
             memset(storage, 0, sizeof(struct sockaddr_storage));
             if (get_sockaddr(host, port, storage, 1, ipv6first) == -1) {
                 FATAL("failed to resolve the provided hostname");
@@ -1576,7 +1576,7 @@ Same behavior as `-T`; see that option for details. Short alias: `-T`.
         // Handle additionals TOS/DSCP listening ports
         if (dscp_num > 0) {
             listen_ctx_current      = (listen_ctx_t *)ss_malloc(sizeof(listen_ctx_t));
-            listen_ctx_current      = memcpy(listen_ctx_current, &listen_ctx, sizeof(listen_ctx_t));
+            listen_ctx_current      = (listen_ctx_t *)memcpy(listen_ctx_current, &listen_ctx, sizeof(listen_ctx_t));
             local_port              = dscp[dscp_num - 1].port;
             listen_ctx_current->tos = dscp[dscp_num - 1].dscp << 2;
         }

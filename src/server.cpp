@@ -1,5 +1,5 @@
 /*
- * server.c - Provide shadowsocks service
+ * server.cpp - Provide shadowsocks service
  *
  * Copyright (C) 2013 - 2019, Max Lv <max.c.lv@gmail.com>
  *
@@ -177,7 +177,7 @@ static void stat_resolved(struct sockaddr *address, void *data)
     int fd = ss_socket(address->sa_family, SOCK_DGRAM, 0);
     if (fd == -1) return;
     setnonblocking(fd);
-    const char *message = data;
+    const char *message = (const char *)data;
     size_t length = strlen(message) + 1;
     if (sendto(fd, message, length, 0, address, get_sockaddr_len(address)) != (ssize_t)length)
         ERROR("stat_sendto");
@@ -1209,7 +1209,7 @@ server_recv_cb(SS_P_ ss_io *w, int revents)
         } else {
             ss_io_stop(SS_A_ & server_recv_ctx->io);
 
-            query_t *query = ss_malloc(sizeof(query_t));
+            query_t *query = (query_t *)ss_malloc(sizeof(query_t));
             memset(query, 0, sizeof(query_t));
             query->server = server;
             server->query = query;
@@ -1569,12 +1569,12 @@ new_remote(int fd)
         LOGI("new connection to remote, %d opened remote connections", remote_conn);
     }
 
-    remote_t *remote = ss_malloc(sizeof(remote_t));
+    remote_t *remote = (remote_t *)ss_malloc(sizeof(remote_t));
     memset(remote, 0, sizeof(remote_t));
 
-    remote->recv_ctx = ss_malloc(sizeof(remote_ctx_t));
-    remote->send_ctx = ss_malloc(sizeof(remote_ctx_t));
-    remote->buf      = ss_malloc(sizeof(buffer_t));
+    remote->recv_ctx = (struct remote_ctx *)ss_malloc(sizeof(remote_ctx_t));
+    remote->send_ctx = (struct remote_ctx *)ss_malloc(sizeof(remote_ctx_t));
+    remote->buf      = (buffer_t *)ss_malloc(sizeof(buffer_t));
     balloc(remote->buf, SOCKET_BUF_SIZE);
     memset(remote->recv_ctx, 0, sizeof(remote_ctx_t));
     memset(remote->send_ctx, 0, sizeof(remote_ctx_t));
@@ -1630,13 +1630,13 @@ new_server(int fd, listen_ctx_t *listener)
     }
 
     server_t *server;
-    server = ss_malloc(sizeof(server_t));
+    server = (server_t *)ss_malloc(sizeof(server_t));
 
     memset(server, 0, sizeof(server_t));
 
-    server->recv_ctx = ss_malloc(sizeof(server_ctx_t));
-    server->send_ctx = ss_malloc(sizeof(server_ctx_t));
-    server->buf      = ss_malloc(sizeof(buffer_t));
+    server->recv_ctx = (struct server_ctx *)ss_malloc(sizeof(server_ctx_t));
+    server->send_ctx = (struct server_ctx *)ss_malloc(sizeof(server_ctx_t));
+    server->buf      = (buffer_t *)ss_malloc(sizeof(buffer_t));
     memset(server->recv_ctx, 0, sizeof(server_ctx_t));
     memset(server->send_ctx, 0, sizeof(server_ctx_t));
     balloc(server->buf, SOCKET_BUF_SIZE);
@@ -1651,8 +1651,8 @@ new_server(int fd, listen_ctx_t *listener)
     server->listen_ctx          = listener;
     server->remote              = NULL;
 
-    server->e_ctx = ss_malloc(sizeof(cipher_ctx_t));
-    server->d_ctx = ss_malloc(sizeof(cipher_ctx_t));
+    server->e_ctx = (cipher_ctx_t *)ss_malloc(sizeof(cipher_ctx_t));
+    server->d_ctx = (cipher_ctx_t *)ss_malloc(sizeof(cipher_ctx_t));
     crypto->ctx_init(crypto->cipher, server->e_ctx, 1);
     crypto->ctx_init(crypto->cipher, server->d_ctx, 0);
     cipher_ctx_pair(server->e_ctx, server->d_ctx);
@@ -1929,59 +1929,59 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
 [cli_long_nameserver] */
 
 /* [cli-options]
-\snippet{doc} utils.c cli_short_f
-\snippet{doc} server.c cli_short_s
-\snippet{doc} server.c cli_short_p
-\snippet{doc} utils.c cli_short_k
-\snippet{doc} utils.c cli_short_t
-\snippet{doc} utils.c cli_short_m
-\snippet{doc} server.c cli_short_b
-\snippet{doc} utils.c cli_short_c
-\snippet{doc} utils.c cli_short_i
-\snippet{doc} utils.c cli_short_d
-\snippet{doc} utils.c cli_short_a
-\snippet{doc} utils.c cli_short_n
-\snippet{doc} utils.c cli_short_h
-\snippet{doc} utils.c cli_short_u
-\snippet{doc} utils.c cli_short_U
-\snippet{doc} utils.c cli_short_v
-\snippet{doc} utils.c cli_short_6
-\snippet{doc} utils.c cli_short_A
-\snippet{doc} server.c cli_long_config
-\snippet{doc} server.c cli_long_cipher
-\snippet{doc} server.c cli_long_timeout
-\snippet{doc} server.c cli_long_user
-\snippet{doc} server.c cli_long_pid_file
-\snippet{doc} server.c cli_long_nofile
-\snippet{doc} server.c cli_long_udp
-\snippet{doc} server.c cli_long_udp_only
-\snippet{doc} server.c cli_long_ipv6_first
-\snippet{doc} server.c cli_long_verbose
-\snippet{doc} server.c cli_long_listen_address
-\snippet{doc} server.c cli_long_listen_port
-\snippet{doc} server.c cli_long_outbound_address
-\snippet{doc} server.c cli_long_interface
-\snippet{doc} server.c cli_long_nameserver
-\snippet{doc} utils.c cli_long_version
-\snippet{doc} utils.c cli_long_tcp_only
-\snippet{doc} utils.c cli_long_ipv4_first
-\snippet{doc} utils.c cli_long_fast_open
-\snippet{doc} utils.c cli_long_reuse_port
-\snippet{doc} utils.c cli_long_tcp_incoming_sndbuf
-\snippet{doc} utils.c cli_long_tcp_incoming_rcvbuf
-\snippet{doc} utils.c cli_long_tcp_outgoing_sndbuf
-\snippet{doc} utils.c cli_long_tcp_outgoing_rcvbuf
-\snippet{doc} utils.c cli_long_no_delay
-\snippet{doc} utils.c cli_long_acl
-\snippet{doc} utils.c cli_long_manager_address
-\snippet{doc} utils.c cli_long_mtu
-\snippet{doc} utils.c cli_long_help
-\snippet{doc} utils.c cli_long_plugin
-\snippet{doc} utils.c cli_long_plugin_opts
-\snippet{doc} utils.c cli_long_password
-\snippet{doc} utils.c cli_long_key
-\snippet{doc} utils.c cli_long_mptcp
-\snippet{doc} utils.c cli_long_nftables_sets
+\snippet{doc} utils.cpp cli_short_f
+\snippet{doc} server.cpp cli_short_s
+\snippet{doc} server.cpp cli_short_p
+\snippet{doc} utils.cpp cli_short_k
+\snippet{doc} utils.cpp cli_short_t
+\snippet{doc} utils.cpp cli_short_m
+\snippet{doc} server.cpp cli_short_b
+\snippet{doc} utils.cpp cli_short_c
+\snippet{doc} utils.cpp cli_short_i
+\snippet{doc} utils.cpp cli_short_d
+\snippet{doc} utils.cpp cli_short_a
+\snippet{doc} utils.cpp cli_short_n
+\snippet{doc} utils.cpp cli_short_h
+\snippet{doc} utils.cpp cli_short_u
+\snippet{doc} utils.cpp cli_short_U
+\snippet{doc} utils.cpp cli_short_v
+\snippet{doc} utils.cpp cli_short_6
+\snippet{doc} utils.cpp cli_short_A
+\snippet{doc} server.cpp cli_long_config
+\snippet{doc} server.cpp cli_long_cipher
+\snippet{doc} server.cpp cli_long_timeout
+\snippet{doc} server.cpp cli_long_user
+\snippet{doc} server.cpp cli_long_pid_file
+\snippet{doc} server.cpp cli_long_nofile
+\snippet{doc} server.cpp cli_long_udp
+\snippet{doc} server.cpp cli_long_udp_only
+\snippet{doc} server.cpp cli_long_ipv6_first
+\snippet{doc} server.cpp cli_long_verbose
+\snippet{doc} server.cpp cli_long_listen_address
+\snippet{doc} server.cpp cli_long_listen_port
+\snippet{doc} server.cpp cli_long_outbound_address
+\snippet{doc} server.cpp cli_long_interface
+\snippet{doc} server.cpp cli_long_nameserver
+\snippet{doc} utils.cpp cli_long_version
+\snippet{doc} utils.cpp cli_long_tcp_only
+\snippet{doc} utils.cpp cli_long_ipv4_first
+\snippet{doc} utils.cpp cli_long_fast_open
+\snippet{doc} utils.cpp cli_long_reuse_port
+\snippet{doc} utils.cpp cli_long_tcp_incoming_sndbuf
+\snippet{doc} utils.cpp cli_long_tcp_incoming_rcvbuf
+\snippet{doc} utils.cpp cli_long_tcp_outgoing_sndbuf
+\snippet{doc} utils.cpp cli_long_tcp_outgoing_rcvbuf
+\snippet{doc} utils.cpp cli_long_no_delay
+\snippet{doc} utils.cpp cli_long_acl
+\snippet{doc} utils.cpp cli_long_manager_address
+\snippet{doc} utils.cpp cli_long_mtu
+\snippet{doc} utils.cpp cli_long_help
+\snippet{doc} utils.cpp cli_long_plugin
+\snippet{doc} utils.cpp cli_long_plugin_opts
+\snippet{doc} utils.cpp cli_long_password
+\snippet{doc} utils.cpp cli_long_key
+\snippet{doc} utils.cpp cli_long_mptcp
+\snippet{doc} utils.cpp cli_long_nftables_sets
 [cli-options] */
     static struct option long_options[] = {
         { "config", required_argument, NULL, 'c' },
@@ -2325,7 +2325,7 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
     }
 
     if (server_num == 0) {
-        server_addr[server_num++].host = "0.0.0.0";
+        server_addr[server_num++].host = (char *)"0.0.0.0";
     }
 
     if (server_num == 0 || server_port == NULL
@@ -2335,9 +2335,9 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
     }
 
     if (is_ipv6only(server_addr, server_num, ipv6first)) {
-        plugin_host = "::1";
+        plugin_host = (char *)"::1";
     } else {
-        plugin_host = "127.0.0.1";
+        plugin_host = (char *)"127.0.0.1";
     }
 
     remote_port = server_port;
@@ -2365,11 +2365,11 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
     }
 
     if (method == NULL) {
-        method = "chacha20-ietf-poly1305";
+        method = (char *)"chacha20-ietf-poly1305";
     }
 
     if (timeout == NULL) {
-        timeout = "60";
+        timeout = (char *)"60";
     }
     if (ss_parse_int(timeout, 1, INT_MAX, &timeout_secs) == -1) {
         FATAL("invalid timeout");
@@ -2490,7 +2490,7 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
     if (plugin != NULL) {
         int len          = 0;
         size_t buf_size  = 256 * server_num;
-        char *server_str = ss_malloc(buf_size);
+        char *server_str = (char *)ss_malloc(buf_size);
 
         snprintf(server_str, buf_size, "%s", server_addr[0].host);
         len = strlen(server_str);
@@ -2511,8 +2511,9 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
         }
     }
 
-    // initialize listen context
-    listen_ctx_t listen_ctx_list[server_num];
+    // initialize listen context (server_num never exceeds MAX_REMOTE_NUM, the
+    // size of server_addr)
+    listen_ctx_t listen_ctx_list[MAX_REMOTE_NUM];
 
     // bind to each interface
     if (mode != UDP_ONLY) {
