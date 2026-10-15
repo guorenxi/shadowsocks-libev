@@ -82,6 +82,7 @@ enum datatypes {
 #include <libnetfilter_conntrack/libnetfilter_conntrack_tcp.h>
 #endif
 
+#include "core/heap_guard.hpp"
 #include "relay/tcp.hpp"
 #include "relay/udp.hpp"
 
@@ -131,6 +132,8 @@ static int mode      = TCP_ONLY;
 static int ipv6first = 0;
 int fast_open        = 0;
 static int no_delay  = 0;
+static int max_connections  = 0;
+static int max_udp_sessions = 0;
 static int ret_val   = 0;
 
 #ifdef HAVE_SETRLIMIT
@@ -225,7 +228,7 @@ stat_update_cb(SS_P_ ss_timer *watcher, int revents)
         strncpy(svaddr.sun_path, manager_addr, sizeof(svaddr.sun_path) - 1);
 
         if (sendto(sfd, resp, strlen(resp) + 1, 0, (struct sockaddr *)&svaddr,
-                   sizeof(struct sockaddr_un)) != msgLen) {
+                   sizeof(struct sockaddr_un)) != (ssize_t)msgLen) {
             ERROR("stat_sendto");
             ss_socket_close(sfd);
             return;
@@ -821,6 +824,10 @@ plugin_watcher_cb(SS_P_ ss_io *w, int revents)
 int
 main(int argc, char **argv)
 {
+    // Bounded heaps for libuv, c-ares and Mbed TLS before any of them runs.
+    if (!ss::install_library_heaps())
+        FATAL("failed to reserve the library heaps");
+
     int i, c;
     int pid_flags   = 0;
     int mptcp       = 0;
@@ -982,6 +989,8 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
 \snippet{doc} utils.cpp cli_long_tcp_outgoing_sndbuf
 \snippet{doc} utils.cpp cli_long_tcp_outgoing_rcvbuf
 \snippet{doc} utils.cpp cli_long_no_delay
+\snippet{doc} utils.cpp cli_long_max_connections
+\snippet{doc} utils.cpp cli_long_max_udp_sessions
 \snippet{doc} utils.cpp cli_long_acl
 \snippet{doc} utils.cpp cli_long_manager_address
 \snippet{doc} utils.cpp cli_long_mtu
@@ -1019,6 +1028,8 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
         { "tcp-outgoing-sndbuf", required_argument, NULL, GETOPT_VAL_TCP_OUTGOING_SNDBUF },
         { "tcp-outgoing-rcvbuf", required_argument, NULL, GETOPT_VAL_TCP_OUTGOING_RCVBUF },
         { "no-delay",        no_argument,       NULL, GETOPT_VAL_NODELAY     },
+        { "max-connections", required_argument, NULL, GETOPT_VAL_MAX_CONNECTIONS },
+        { "max-udp-sessions", required_argument, NULL, GETOPT_VAL_MAX_UDP_SESSIONS },
         { "acl",             required_argument, NULL, GETOPT_VAL_ACL         },
         { "manager-address", required_argument, NULL,
           GETOPT_VAL_MANAGER_ADDRESS },
@@ -1059,6 +1070,16 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
             break;
         case GETOPT_VAL_FAST_OPEN:
             fast_open = 1;
+            break;
+        case GETOPT_VAL_MAX_CONNECTIONS:
+            if (ss_parse_int(optarg, 1, 1 << 20, &max_connections) == -1) {
+                cli_error("invalid connection limit", c, NULL);
+            }
+            break;
+        case GETOPT_VAL_MAX_UDP_SESSIONS:
+            if (ss_parse_int(optarg, 1, 1 << 20, &max_udp_sessions) == -1) {
+                cli_error("invalid UDP session limit", c, NULL);
+            }
             break;
         case GETOPT_VAL_NODELAY:
             no_delay = 1;
@@ -1259,6 +1280,12 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
         }
         if (no_delay == 0) {
             no_delay = conf->no_delay;
+        }
+        if (max_connections == 0) {
+            max_connections = conf->max_connections;
+        }
+        if (max_udp_sessions == 0) {
+            max_udp_sessions = conf->max_udp_sessions;
         }
         if (reuse_port == 0) {
             reuse_port = conf->reuse_port;
@@ -1531,14 +1558,15 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
     ss::relay::UdpRelay udp_relay;
     bool tcp_running = false;
     if (!tcp_loop.adopt(ss_native_loop(loop))
-        || !tcp_resolver.init(tcp_loop, nameservers, ipv6first != 0, DEFAULT_MAX_CONNECTIONS + 64)) {
+        || !tcp_resolver.init(tcp_loop, nameservers, ipv6first != 0,
+                           (max_connections > 0 ? max_connections : DEFAULT_MAX_CONNECTIONS) + 64)) {
         FATAL("failed to set up the resolver");
     }
     if (mode != UDP_ONLY) {
         ss::relay::TcpConfig tcp_config;
         tcp_config.kind            = ss::relay::Kind::server;
         tcp_config.timeout_secs    = timeout_secs;
-        tcp_config.max_connections = DEFAULT_MAX_CONNECTIONS;
+        tcp_config.max_connections = max_connections > 0 ? max_connections : DEFAULT_MAX_CONNECTIONS;
         tcp_config.fast_open       = fast_open != 0;
         tcp_config.no_delay        = no_delay != 0;
         tcp_config.acl             = acl != 0;
@@ -1613,7 +1641,7 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
         ss::relay::UdpConfig udp_config;
         udp_config.kind         = ss::relay::Kind::server;
         udp_config.timeout_secs = timeout_secs;
-        udp_config.max_sessions = 512;
+        udp_config.max_sessions = max_udp_sessions > 0 ? max_udp_sessions : 512;
         udp_config.mtu          = mtu;
         udp_config.iface        = iface;
         udp_config.label        = remote_port != NULL ? remote_port : "";
@@ -1678,6 +1706,7 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
 #endif
 
     // start ev loop
+    ss::heap_seal();
     ss_run(loop, 0);
 
     if (verbose) {
@@ -1718,6 +1747,9 @@ Same behavior as `-d`; see that option for details. Short alias: `-d`.
 
     winsock_cleanup();
 #endif
+
+    if (verbose)
+        ss::log_heap_report();
 
     return ret_val;
 }

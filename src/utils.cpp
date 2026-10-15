@@ -271,9 +271,21 @@ FATAL(const char *msg)
     exit(-1);
 }
 
+/* Set once startup is over (see core/heap_guard.hpp); allocations through
+ * these helpers are counted from then on. */
+int ss_heap_sealed            = 0;
+size_t ss_heap_late_allocations = 0;
+
+#define NOTE_ALLOCATION()             \
+    do {                              \
+        if (ss_heap_sealed)           \
+            ss_heap_late_allocations++; \
+    } while (0)
+
 void *
 ss_malloc(size_t size)
 {
+    NOTE_ALLOCATION();
     void *tmp = malloc(size);
     if (tmp == NULL)
         exit(EXIT_FAILURE);
@@ -283,6 +295,7 @@ ss_malloc(size_t size)
 void *
 ss_aligned_malloc(size_t size)
 {
+    NOTE_ALLOCATION();
     int err;
     void *tmp = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
@@ -304,6 +317,7 @@ ss_aligned_malloc(size_t size)
 void *
 ss_realloc(void *ptr, size_t new_size)
 {
+    NOTE_ALLOCATION();
     void *resized = realloc(ptr, new_size);
     if (resized == NULL) {
         free(ptr);
@@ -470,6 +484,20 @@ Only available with MPTCP enabled Linux kernel.
 \par `--no-delay`
 Enable TCP_NODELAY.
 [cli_long_no_delay] */
+
+/* [cli_long_max_connections]
+\par `--max-connections <number>`
+Serve at most this many TCP connections at once (default: 1024). Their
+memory is reserved at startup; a connection beyond the limit is refused
+until another one closes.
+[cli_long_max_connections] */
+
+/* [cli_long_max_udp_sessions]
+\par `--max-udp-sessions <number>`
+Keep at most this many UDP associations (default: 256 for clients, 512
+for ss-server). When the table is full, the least recently used one is
+dropped.
+[cli_long_max_udp_sessions] */
 
 /* [cli_long_tcp_incoming_sndbuf]
 \par `--tcp-incoming-sndbuf <size>`
@@ -690,6 +718,10 @@ usage(void)
     cli_help_option("--fast-open", "Enable TCP Fast Open where supported.");
     cli_help_option("--reuse-port", "Enable port reuse where supported.");
     cli_help_option("--no-delay", "Enable TCP_NODELAY.");
+#ifndef MODULE_MANAGER
+    cli_help_option("--max-connections NUMBER", "TCP connections served at once (default: 1024).");
+    cli_help_option("--max-udp-sessions NUMBER", "UDP associations kept (default: 256; ss-server 512).");
+#endif
 #ifdef MODULE_LOCAL
     cli_help_option("--printable-salt", "Experimental printable TCP salt (chacha20-ietf-poly1305/aes-256-gcm only).");
 #endif
